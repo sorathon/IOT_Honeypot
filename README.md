@@ -1,3 +1,6 @@
+## Presentation : https://canva.link/t0xxfzz8pekncoo
+
+
 Internet / Attacker (แฮกเกอร์, บอทเน็ต)
         │
         ▼ (ตั้งค่า Router: Forward Port 80, 2222, 445 มาที่ Pi)
