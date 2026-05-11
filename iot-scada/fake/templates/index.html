@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Industrial SCADA System</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { background: #1a1a1a; color: #0f0; font-family: 'Courier New', monospace; text-align: center; padding: 20px; }
+        .panel { border: 2px solid #555; background: #262626; padding: 20px; display: inline-block; border-radius: 10px; margin: 10px; min-width: 250px; }
+        .value { font-size: 50px; color: #ffeb3b; margin: 10px 0; }
+        .status-box { padding: 15px; font-weight: bold; border-radius: 5px; margin-top: 10px; font-size: 20px; transition: 0.3s; }
+        .btn { padding: 15px 30px; font-size: 18px; cursor: pointer; margin: 10px; border: none; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+        .btn-start { background: #28a745; color: white; }
+        .btn-stop { background: #dc3545; color: white; }
+        .btn:active { transform: scale(0.9); }
+        .btn:disabled { background: #444; opacity: 0.6; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>PLANT MONITORING SYSTEM</h1>
+    <hr style="border: 1px solid #333; width: 80%;">
+
+    <div class="panel">
+        <h3>REACTOR TEMP</h3>
+        <div class="value"><span id="temp">--</span> °C</div>
+    </div>
+
+    <div class="panel">
+        <h3>PUMP #01 STATUS</h3>
+        <div id="pump_ui" class="status-box">LOADING...</div>
+        <div style="margin-top: 20px;">
+            <button class="btn btn-start ctrl-btn" onclick="sendControl(1)">START PUMP</button>
+            <button class="btn btn-stop ctrl-btn" onclick="sendControl(0)">STOP PUMP</button>
+        </div>
+    </div>
+
+    <script>
+        let isSyncing = false;
+
+        function updateDashboard() {
+            // ใช้ $.ajax แทน $.getJSON เพื่อใส่ Timeout ป้องกันเว็บค้าง/หน่วง
+            $.ajax({
+                url: '/get_status?t=' + new Date().getTime(), // ป้องกัน Browser จำค่าเก่า
+                type: 'GET',
+                dataType: 'json',
+                timeout: 2000, // 🚨 ถ้า Flask ไม่ตอบใน 2 วิ ให้เลิกรอ (ป้องกันคิวเต็ม)
+                success: function(data) {
+                    $('#temp').text(data.temp);
+                    
+                    // อัปเดต UI เฉพาะตอนที่ไม่ได้กดปุ่มอยู่
+                    if (!isSyncing) {
+                        let pumpStatus = String(data.pump).toLowerCase();
+                        if(pumpStatus === "1" || pumpStatus === "true") {
+                            $('#pump_ui').text('RUNNING').css({'background': '#28a745', 'color': 'white'});
+                        } else {
+                            $('#pump_ui').text('STOPPED').css({'background': '#dc3545', 'color': 'white'});
+                        }
+                    }
+                },
+                error: function() {
+                    console.log("Error: Cannot connect to API or Timeout");
+                }
+            });
+        }
+
+        function sendControl(val) {
+            if (isSyncing) return; // ป้องกันการกดรัวๆ
+            isSyncing = true;
+
+            const pi_ip = window.location.hostname;
+            
+            // โชว์สถานะกำลังส่งคำสั่ง และล็อคปุ่มกันกดซ้ำ
+            $('#pump_ui').text('WAITING...').css({'background': 'orange', 'color': 'white'});
+            $('.ctrl-btn').prop('disabled', true);
+
+            // ส่งคำสั่งไปที่ Node-RED Port 1880 พร้อมตั้งเวลาตัดสาย
+            $.ajax({
+                url: `http://${pi_ip}:1880/control_pump/${val}`,
+                type: 'GET',
+                timeout: 2000, // 🚨 ป้องกันเว็บหน่วง: ถ้า Node-RED ไม่ตอบใน 2 วิ ให้วางสายทิ้งทันที
+                success: function() {
+                    console.log("Command Sent: " + val);
+                },
+                error: function() {
+                    console.log("Command Timeout (Connection dropped to prevent lag)");
+                }
+            });
+
+            // ไม่ว่าฝั่งนู้นจะตอบหรือไม่ พอครบ 1.5 วินาที ให้บังคับปลดล็อคหน้าจอเลย
+            setTimeout(function() {
+                isSyncing = false;
+                $('.ctrl-btn').prop('disabled', false);
+                updateDashboard(); // ดึงค่าจริงจาก Flask มาแสดงทันที
+            }, 1500);
+        }
+
+        // อัปเดตข้อมูลทุก 1 วินาที
+        setInterval(updateDashboard, 1000);
+        
+        // รันครั้งแรกทันทีที่โหลดหน้า
+        $(document).ready(updateDashboard);
+    </script>
+</body>
+</html>

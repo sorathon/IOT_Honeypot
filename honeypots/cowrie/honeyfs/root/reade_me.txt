@@ -1,0 +1,4 @@
+IMPORTANT: Do not share these credentials!
+DB_HOST=10.0.1.50
+DB_USER=admin
+DB_PASS=P@ssw0rd2026

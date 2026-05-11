@@ -1,0 +1,51 @@
+services:
+  cowrie:
+    image: cowrie/cowrie:latest
+    environment:
+      - TZ=Asia/Bangkok
+    ports:
+      - "2222:2222"
+      - "2223:2223"
+    volumes:
+      - ./logs/cowrie:/cowrie/cowrie-server/var/log/cowrie
+      - /etc/localtime:/etc/localtime:ro
+      - ./logs/cowrie:/cowrie/cowrie-git/var/log/cowrie
+    restart: always
+
+  scada-web:
+    build: ./web_scada
+    ports:
+      - "8081:5000"
+    restart: always
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.10.2
+    user: root
+    environment:
+      - TZ=Asia/Bangkok
+    volumes:
+      - ./logs/cowrie:/var/log/honeypots/cowrie:ro
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./logs/opencanary:/var/log/opencanary:ro
+    depends_on:
+      - cowrie
+      - opencanary
+
+  opencanary:
+    container_name: opencanary
+    build: ./opencanary
+    environment:
+      - TZ=Asia/Bangkok
+    # ปรับ entrypoint ให้ลบไฟล์ pid เก่าก่อนเริ่มรัน
+    entrypoint: /bin/sh -c "rm -f /var/run/opencanaryd.pid && opencanaryd --dev --allow-run-as-root"
+    volumes:
+      - ./opencanary/opencanary.conf:/root/.opencanary.conf
+      - /etc/localtime:/etc/localtime:ro      
+      - /etc/timezone:/etc/timezone:ro
+      - ./logs/opencanary:/var/log/opencanary
+    ports:
+      - "8080:80"
+      - "21:21"
+      - "1433:1433" # เพิ่ม port mssql ตาม config ของคุณด้วย
+    restart: always

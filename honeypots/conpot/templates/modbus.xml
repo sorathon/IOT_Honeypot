@@ -1,0 +1,24 @@
+<conpot_template name="scada_gateway" description="Industrial Modbus Gateway">
+    <core>
+        <databus>
+            <key_value_mappings>
+                <key name="temp_sensor">
+                    <value type="int">25</value>
+                </key>
+                <key name="pump_status">
+                    <value type="int">1</value>
+                </key>
+            </key_value_mappings>
+        </databus>
+    </core>
+    <protocols>
+        <protocol name="modbus" port="502">
+            <slave id="1">
+                <holding_registers>
+                    <register address="40001" name="temp_sensor" />
+                    <register address="40002" name="pump_status" />
+                </holding_registers>
+            </slave>
+        </protocol>
+    </protocols>
+</conpot_template>

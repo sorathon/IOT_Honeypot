@@ -1,0 +1,124 @@
+services:
+  # 1. Cowrie: ล่อเป้า SSH
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: cowrie
+    networks:
+      - honeypot_net
+    ports:
+      - "22:2222"
+    environment:
+      - COWRIE_USERDB_PATH=/cowrie/cowrie-git/etc/userdb.txt
+      - COWRIE_CONTENTS_PATH=/cowrie/cowrie-git/honeyfs
+      - TZ=Asia/Bangkok
+      - COWRIE_HOSTNAME=web-prod-01
+    volumes:
+      - /home/hacker/teamject/honeypots/cowrie/honeyfs:/cowrie/cowrie-git/honeyfs
+      - /home/hacker/teamject/honeypots/cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt
+      - /home/hacker/teamject/honeypots/cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg
+      - /home/hacker/teamject/logs/cowrie:/cowrie/cowrie-git/var/log/cowrie
+    deploy:
+      resources:
+        limits:
+          cpus: '0.30'
+          memory: 256M
+    restart: always
+  # 2. OpenCanary: ล่อเป้า FTP, SQL
+  opencanary:
+    container_name: opencanary
+    build: ./honeypots/opencanary
+    network_mode: host
+    environment:
+      - TZ=Asia/Bangkok
+      - PYTHONUNBUFFERED=1
+    entrypoint: /bin/sh -c "rm -f /var/run/opencanaryd.pid && twistd --nodaemon -y /usr/local/bin/opencanary.tac"
+    volumes:
+      - ./honeypots/opencanary/opencanary.conf:/root/.opencanary.conf
+      - ./logs/opencanary:/var/log/opencanary
+      - /etc/localtime:/etc/localtime:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'
+          memory: 128M
+    restart: unless-stopped
+
+  conpot:
+    build: ./honeypots/conpot  # ชี้ไปที่โฟลเดอร์ที่มี Dockerfile (Python Sim)
+    container_name: conpot
+    networks:
+      - honeypot_net
+    ports:
+      - "502:502"
+    restart: always
+
+  # --- ส่วนของ Node-RED Gateway ---
+  nodered:
+    image: nodered/node-red:latest
+    container_name: nodered
+    networks:
+      - honeypot_net
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./monitoring/nodered/data:/data  # เก็บ Flow ที่เราวาดไว้ไม่ให้หาย
+    user: "0"
+    restart: always
+  # 3. SCADA Web: หน้าเว็บโรงงานปลอม
+  scada-fake:
+    build: ./iot-scada/fake
+    container_name: scada_fake
+    networks:
+      - honeypot_net
+    ports:
+      # สำคัญ: ใส่ 127.0.0.1 เพื่อบังคับให้เข้าผ่าน Nginx เท่านั้น ป้องกันแฮกเกอร์ Bypass!
+      - "127.0.0.1:8081:5000"
+    volumes:
+      - ./iot-scada/fake:/app
+      - ./logs/scada_fake:/var/log/scada
+    restart: always
+
+  # [เพิ่มใหม่] 3.5 SCADA Real: ระบบจริงสำหรับคุณ (เข้าผ่าน VPN หรือ IP ที่อนุญาต)
+  scada-real:
+    build: ./iot-scada/real
+    container_name: scada_real
+    networks:
+      - honeypot_net
+    ports:
+      # ผูกไว้กับ Port 8082 ภายในเครื่องเท่านั้น
+      - "127.0.0.1:8082:5000"
+    volumes:
+      - ./iot-scada/real:/app
+    restart: always
+  # 4. Filebeat: ส่ง Log ให้เพื่อน (100.115.177.97)
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.10.2
+    container_name: filebeat
+    user: root
+    networks:
+      - honeypot_net
+    volumes:
+      - ./logs/cowrie:/var/log/honeypots/cowrie:ro
+      - ./logs/opencanary:/var/log/opencanary:ro
+      - ./monitoring/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./logs/scada_fake:/var/log/honeypots/scada_fake:ro
+    depends_on:
+      - cowrie
+      - opencanary
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-gateway
+    network_mode: "host" # สำคัญมากเพื่อให้เห็น Source IP จริง
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./logs/web:/var/log/nginx
+    restart: always
+  
+
+networks:
+  honeypot_net:
+
+
+
+    driver: bridge

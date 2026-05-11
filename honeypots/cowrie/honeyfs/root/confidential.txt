@@ -1,0 +1,5 @@
+[INTERNAL ONLY]
+Production DB Access:
+Host: 10.0.0.5
+User: dbadmin
+Pass: Spring2026!_secure

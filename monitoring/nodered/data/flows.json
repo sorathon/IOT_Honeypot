@@ -1,0 +1,226 @@
+[
+    {
+        "id": "874e520deb46e664",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "a7b92130f0e47087",
+        "type": "modbus-client",
+        "name": "conpot",
+        "clienttype": "tcp",
+        "bufferCommands": true,
+        "stateLogEnabled": true,
+        "queueLogEnabled": false,
+        "failureLogEnabled": true,
+        "tcpHost": "conpot",
+        "tcpPort": 502,
+        "tcpType": "DEFAULT",
+        "serialPort": "/dev/ttyUSB",
+        "serialType": "RTU-BUFFERD",
+        "serialBaudrate": 9600,
+        "serialDatabits": 8,
+        "serialStopbits": 1,
+        "serialParity": "none",
+        "serialConnectionDelay": 100,
+        "serialAsciiResponseStartDelimiter": "0x3A",
+        "unit_id": 1,
+        "commandDelay": 1,
+        "clientTimeout": "2000",
+        "reconnectOnTimeout": true,
+        "reconnectTimeout": "5000",
+        "parallelUnitIdsAllowed": true,
+        "showErrors": true,
+        "showWarnings": true,
+        "showLogs": true
+    },
+    {
+        "id": "9e025d6a4ee14ad7",
+        "type": "modbus-read",
+        "z": "874e520deb46e664",
+        "name": "",
+        "topic": "",
+        "showStatusActivities": true,
+        "logIOActivities": false,
+        "showErrors": true,
+        "showWarnings": true,
+        "unitid": "",
+        "dataType": "HoldingRegister",
+        "adr": "0",
+        "quantity": "2",
+        "rate": "3",
+        "rateUnit": "s",
+        "delayOnStart": false,
+        "enableDeformedMessages": false,
+        "startDelayTime": "",
+        "server": "a7b92130f0e47087",
+        "useIOFile": false,
+        "ioFile": "",
+        "useIOForPayload": false,
+        "emptyMsgOnFail": false,
+        "x": 230,
+        "y": 160,
+        "wires": [
+            [],
+            [
+                "7c8d268d5473e863"
+            ]
+        ]
+    },
+    {
+        "id": "6b7d2039b7fe39d2",
+        "type": "debug",
+        "z": "874e520deb46e664",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": true,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 630,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "7c8d268d5473e863",
+        "type": "function",
+        "z": "874e520deb46e664",
+        "name": "function 1",
+        "func": "// ตรวจสอบก่อนว่ามีข้อมูลส่งมาจาก Modbus จริงไหม\nif (msg.payload && msg.payload.data) {\n    msg.payload = {\n        \"temp\": msg.payload.data[0], // ดึงค่าจากอาเรย์ data ช่องที่ 0\n        \"pump\": msg.payload.data[1]  // ดึงค่าจากอาเรย์ data ช่องที่ 1\n    };\n} else {\n    // กรณีข้อมูลไม่มา ให้คงค่าเดิมไว้หรือส่ง null\n    msg.payload = { \"temp\": 0, \"pump\": 0 };\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 160,
+        "wires": [
+            [
+                "62178a46b2a6011b",
+                "6b7d2039b7fe39d2"
+            ]
+        ]
+    },
+    {
+        "id": "62178a46b2a6011b",
+        "type": "http request",
+        "z": "874e520deb46e664",
+        "name": "",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://scada-fake:5000/update_data",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 650,
+        "y": 160,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "769535613da38552",
+        "type": "http in",
+        "z": "874e520deb46e664",
+        "name": "",
+        "url": "/control_pump/:status",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 210,
+        "y": 260,
+        "wires": [
+            [
+                "aab3760f5449e373"
+            ]
+        ]
+    },
+    {
+        "id": "aab3760f5449e373",
+        "type": "function",
+        "z": "874e520deb46e664",
+        "name": "function 2",
+        "func": "// แปลงจาก String ที่รับมาจาก HTTP (/0 หรือ /1) ให้เป็นตัวเลข Integer 100%\nmsg.payload = parseInt(msg.req.params.status);\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 260,
+        "wires": [
+            [
+                "4b596072cabf59a6",
+                "74ea6a269b26a48e"
+            ]
+        ]
+    },
+    {
+        "id": "4b596072cabf59a6",
+        "type": "modbus-write",
+        "z": "874e520deb46e664",
+        "name": "",
+        "showStatusActivities": false,
+        "showErrors": false,
+        "showWarnings": true,
+        "unitid": "1",
+        "dataType": "HoldingRegister",
+        "adr": "1",
+        "quantity": "1",
+        "server": "a7b92130f0e47087",
+        "emptyMsgOnFail": false,
+        "keepMsgProperties": false,
+        "delayOnStart": false,
+        "startDelayTime": "",
+        "x": 660,
+        "y": 260,
+        "wires": [
+            [],
+            [
+                "dc864b7dd32da62d"
+            ]
+        ]
+    },
+    {
+        "id": "74ea6a269b26a48e",
+        "type": "debug",
+        "z": "874e520deb46e664",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": true,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 730,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "dc864b7dd32da62d",
+        "type": "http response",
+        "z": "874e520deb46e664",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 970,
+        "y": 280,
+        "wires": []
+    }
+]

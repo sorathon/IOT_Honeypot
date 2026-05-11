@@ -1,0 +1,55 @@
+filebeat.inputs:
+  - type: log
+    id: cowrie-honeypot
+    enabled: true
+    paths:
+      - /var/log/honeypots/cowrie/cowrie.json
+    json.keys_under_root: true # แกะ JSON ของ Cowrie ออกมาเป็น Field ทันที
+    json.overwrite_keys: true
+    fields:
+      service_type: "cowrie"
+      honeypot_node: "Pi-Honeypot-01"
+    fields_under_root: true
+
+  - type: log
+    id: opencanary-honeypot
+    enabled: true
+    paths:
+      - /var/log/opencanary/opencanary.log
+    fields:
+      service_type: "opencanary"
+      honeypot_node: "Pi-Honeypot-01"
+    fields_under_root: true
+
+  - type: log
+    id: scada-fake-honeypot
+    enabled: true
+    paths:
+      - /var/log/honeypots/scada_fake/scada_auth.json
+    json.keys_under_root: true
+    json.overwrite_keys: true
+    fields:
+      service_type: "scada_web"
+      honeypot_node: "Pi-Honeypot-01"
+    fields_under_root: true
+# --- การจัดการข้อมูลให้สวยและครบ ---
+processors:
+  - add_host_metadata: ~
+  - add_docker_metadata: ~
+  - add_locale:
+      format: abbreviation # เพิ่ม Timezone (ICT) เข้าไปใน Log
+  - drop_fields: # ตัด Field ที่รกและไม่จำเป็นออก (เพื่อความประหยัด Bandwidth)
+      fields: ["agent.ephemeral_id", "agent.hostname", "agent.id", "agent.type", "agent.version", "ecs.version", "log.offset"]
+      ignore_missing: true
+
+# --- ส่งข้อมูลไปหาเพื่อน (Dashboard) ---
+output.logstash:
+  hosts: ["100.115.177.97:5044"]
+  ssl.enabled: false
+
+  timeout: 60s               # รอคำตอบรับจาก Logstash นานขึ้น (แก้ i/o timeout)
+  worker: 1                  # ใช้ worker เดียวเพื่อลดภาระ overhead ของ vpn
+  bulk_max_size: 1024        # ส่งทีละไม่เยอะเกินไป ป้องกันแพ็กเก็ตตกหล่น
+  backoff.init: 2s           # ถ้าหลุด ให้รอ 2 วินาทีก่อนลองใหม่
+  backoff.max: 30s           # รอสูงสุดไม่เกิน 30 วินาที
+logging.level: info
